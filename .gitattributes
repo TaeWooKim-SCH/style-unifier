@@ -1,0 +1,86 @@
+# ============================================================
+# 줄바꿈 통일 (3-OS 프로젝트 핵심)
+# CLAUDE.md 및 STYLE.md에서 명시: 모든 텍스트는 LF
+# ============================================================
+
+# 기본: 텍스트는 LF로 정규화
+* text=auto eol=lf
+
+# ============================================================
+# 텍스트 파일 (명시적 LF)
+# ============================================================
+*.py text eol=lf
+*.pyi text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+*.sh text eol=lf
+*.env text eol=lf
+
+Dockerfile text eol=lf
+Makefile text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# ============================================================
+# Windows 전용 (CRLF 유지)
+# ============================================================
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ============================================================
+# 바이너리 (절대 변환 금지)
+# ============================================================
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.svg binary
+
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.xz binary
+*.7z binary
+*.rar binary
+
+# 모델 파일 (보통 .gitignore로 차단되지만 혹시나)
+*.safetensors binary
+*.ckpt binary
+*.bin binary
+*.pth binary
+*.pt binary
+*.onnx binary
+*.h5 binary
+
+# ============================================================
+# Git LFS (대용량 파일 처리, 필요시 활성화)
+# 현재 비활성화. 이미지/모델은 .gitignore로 처리 중.
+# 활성화하려면 `git lfs track "*.psd"` 같은 명령 사용
+# ============================================================
+# *.psd filter=lfs diff=lfs merge=lfs -text
+# *.blend filter=lfs diff=lfs merge=lfs -text
+
+# ============================================================
+# 언어 감지 (GitHub 통계 정확도)
+# ============================================================
+# 문서는 언어 통계에서 제외
+*.md linguist-documentation
+docs/** linguist-documentation
+
+# 실험 로그/설정도 제외
+experiments/** linguist-generated
+
+# 데이터 메타데이터 제외
+data/**.json linguist-generated

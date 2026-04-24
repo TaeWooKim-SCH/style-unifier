@@ -1,0 +1,155 @@
+[project]
+name = "style-unifier"
+version = "0.1.0"
+description = "AI 기반 2D 게임 에셋 스타일 통일 도구"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Kim Taewoo", email = "" }
+]
+keywords = [
+    "stable-diffusion",
+    "style-transfer",
+    "game-assets",
+    "computer-vision",
+    "indie-gamedev",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# 런타임 의존성은 requirements.txt 참조
+# (pip install -r requirements.txt로 설치)
+
+[project.urls]
+Homepage = "https://github.com/TaeWooKim-SCH/style-unifier"
+Repository = "https://github.com/TaeWooKim-SCH/style-unifier"
+Documentation = "https://github.com/TaeWooKim-SCH/style-unifier/tree/main/docs"
+Issues = "https://github.com/TaeWooKim-SCH/style-unifier/issues"
+
+# ============================================================
+# Ruff 설정 (포맷 + 린트)
+# ============================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "scripts", "app", "tests"]
+exclude = [
+    ".venv",
+    "venv",
+    "__pycache__",
+    "data",
+    "experiments",
+    ".ruff_cache",
+    ".pytest_cache",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (임포트 순서)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (modern Python syntax)
+    "B",    # bugbear (흔한 버그 패턴)
+    "SIM",  # simplify
+    "RUF",  # Ruff 고유 규칙
+    "PTH",  # flake8-use-pathlib
+    "D",    # pydocstyle (docstring)
+]
+ignore = [
+    "E501",    # line too long (formatter가 처리)
+    "D100",    # missing docstring in public module (프로젝트 전체 강제는 과함)
+    "D104",    # missing docstring in public package
+    "D107",    # missing docstring in __init__ (클래스 docstring에 통합)
+    "D203",    # 1 blank line before class docstring (D211과 충돌)
+    "D213",    # multi-line summary 2nd line (D212와 충돌)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "style_unifier"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 테스트 파일은 docstring 느슨하게
+"tests/**/*.py" = ["D"]
+# 스크립트는 docstring 느슨하게
+"scripts/**/*.py" = ["D"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+
+# ============================================================
+# Pytest 설정
+# ============================================================
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",               # 실패/에러 요약
+    "--strict-markers",  # 등록 안 된 마커 차단
+    "--strict-config",
+    "-m", "not slow",    # 기본은 빠른 테스트만
+]
+markers = [
+    "slow: 모델 로딩/추론 필요 (기본 실행에서 제외)",
+    "gpu: GPU 필요 (CUDA 또는 MPS)",
+    "integration: 통합 테스트",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# ============================================================
+# Coverage 설정
+# ============================================================
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "tests/*",
+    "scripts/*",
+    "app/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+skip_covered = false
+
+# ============================================================
+# Pyright 설정은 pyrightconfig.json에 별도 정의
+# (일부 VS Code 확장이 pyproject.toml의 pyright 섹션을 무시하는 이슈)
+# ============================================================

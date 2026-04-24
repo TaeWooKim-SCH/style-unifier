@@ -1,0 +1,32 @@
+# ============================================================
+# Style Unifier - CUDA Dependencies (Linux 전용)
+# ============================================================
+# GPU 추론을 위한 PyTorch + xformers.
+# 이 파일은 pip의 --index-url 플래그가 필요해서 직접 `pip install -r`로
+# 설치 불가. 아래 명령어로 개별 설치할 것:
+#
+#   pip install torch==2.1.2 torchvision==0.16.2 \
+#       --index-url https://download.pytorch.org/whl/cu121
+#
+#   pip install xformers==0.0.23.post1 \
+#       --index-url https://download.pytorch.org/whl/cu121
+#
+# 또는 setup 스크립트 사용:
+#   python scripts/install_cuda_deps.py
+# ============================================================
+
+# 이 파일은 "어떤 버전을 써야 하는지" 참고용.
+# 실제 설치는 위 주석의 명령어로 수행.
+#
+# torch==2.1.2              (with CUDA 12.1)
+# torchvision==0.16.2       (with CUDA 12.1)
+# xformers==0.0.23.post1    (matches torch 2.1.2 + CUDA 12.1)
+#
+# ============================================================
+# macOS / Windows CPU 환경
+# ============================================================
+# Mac/Win에서는 CUDA 없이 PyPI 기본 PyTorch 설치:
+#
+#   pip install torch==2.1.2 torchvision==0.16.2
+#
+# xformers는 Mac/Windows에서 설치 생략. (추론 안 함)

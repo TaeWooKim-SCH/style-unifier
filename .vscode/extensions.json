@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-pyright.pyright",
+    "charliermarsh.ruff",
+    "eamodio.gitlens",
+    "redhat.vscode-yaml",
+    "usernamehw.errorlens",
+    "ms-toolsai.jupyter",
+    "aaron-bond.better-comments"
+  ]
+}

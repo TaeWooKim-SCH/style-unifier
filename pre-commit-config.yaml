@@ -1,0 +1,65 @@
+# ============================================================
+# Pre-commit hooks (최소 구성)
+# ============================================================
+# 커밋 전 자동 실행되는 품질 체크.
+# Ruff만 포함 (가볍고 자동 수정 가능).
+#
+# 설치:
+#   pip install pre-commit
+#   pre-commit install
+#
+# 수동 실행:
+#   pre-commit run --all-files
+#
+# 특정 파일만:
+#   pre-commit run --files src/preprocessing/palette.py
+# ============================================================
+
+repos:
+  # --- Ruff (포맷 + 린트) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      # 린트 (자동 수정 가능한 것은 수정)
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # 포맷
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # --- 기본 파일 검사 (빠르고 유용) ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # 후행 공백 제거
+      - id: trailing-whitespace
+        exclude: '\.md$'  # 마크다운은 trailing space가 의미있음 (줄바꿈)
+
+      # 파일 끝 줄바꿈 강제
+      - id: end-of-file-fixer
+
+      # YAML 문법 검증
+      - id: check-yaml
+
+      # JSON 문법 검증
+      - id: check-json
+
+      # TOML 문법 검증
+      - id: check-toml
+
+      # 충돌 마커 검사
+      - id: check-merge-conflict
+
+      # 큰 파일 차단 (실수로 모델 커밋 방지)
+      - id: check-added-large-files
+        args: [--maxkb=5000]  # 5MB
+
+      # Private key 차단
+      - id: detect-private-key
+
+# ============================================================
+# Pyright는 제외
+# 이유: 매 커밋마다 실행하기 무거움. CI에서 돌리거나 수동 실행.
+# 수동 실행: pyright
+# ============================================================

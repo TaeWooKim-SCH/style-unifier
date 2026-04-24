@@ -1,0 +1,50 @@
+# ============================================================
+# Style Unifier - Runtime Dependencies
+# ============================================================
+# 런타임에 필요한 핵심 라이브러리.
+# 정확한 버전 고정 (재현성 우선).
+#
+# 설치 순서:
+#   1. PyTorch를 먼저 설치 (requirements-cuda.txt 또는 CPU)
+#   2. pip install -r requirements.txt
+#
+# 주의: PyTorch는 별도 index-url이 필요하므로 이 파일에 포함하지 않음.
+#       SETUP.md 참조.
+# ============================================================
+
+# --- Diffusion / Transformers 스택 ---
+diffusers==0.27.2
+transformers==4.40.2
+accelerate==0.30.1
+safetensors==0.4.3
+huggingface-hub==0.23.0
+
+# --- 이미지 처리 ---
+Pillow==10.3.0
+numpy==1.26.4
+scipy==1.13.0
+scikit-image==0.23.2
+scikit-learn==1.4.2
+
+# --- ControlNet 보조 (lineart, canny, depth 등) ---
+controlnet-aux==0.0.7
+
+# --- 배경 제거 ---
+# RMBG-1.4는 HuggingFace 모델 형태로 diffusers/transformers로 로드
+# rembg는 편의 fallback용
+rembg==2.0.57
+
+# --- 평가 메트릭 ---
+lpips==0.1.4
+open-clip-torch==2.24.0
+
+# --- UI ---
+gradio==4.31.0
+
+# --- 유틸리티 ---
+PyYAML==6.0.1
+tqdm==4.66.4
+python-dotenv==1.0.1
+
+# --- 로깅 / 직렬화 ---
+rich==13.7.1

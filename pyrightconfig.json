@@ -1,0 +1,42 @@
+{
+    "include": [
+        "src",
+        "scripts",
+        "app",
+        "tests"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "venv",
+        ".venv",
+        "data",
+        "experiments",
+        "build",
+        "dist"
+    ],
+    "pythonVersion": "3.11",
+    "pythonPlatform": "All",
+    "typeCheckingMode": "standard",
+    "useLibraryCodeForTypes": true,
+    "reportMissingTypeStubs": "warning",
+    "reportUnknownMemberType": "none",
+    "reportUnknownArgumentType": "none",
+    "reportUnknownVariableType": "none",
+    "reportUnknownParameterType": "none",
+    "reportMissingImports": "error",
+    "reportMissingModuleSource": "warning",
+    "reportInvalidTypeVarUse": "warning",
+    "reportSelfClsParameterName": "warning",
+    "reportImplicitStringConcatenation": "warning",
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
+    "reportDuplicateImport": "error",
+    "reportOptionalMemberAccess": "warning",
+    "reportOptionalSubscript": "warning",
+    "reportPrivateImportUsage": "warning",
+    "strictListInference": true,
+    "strictDictionaryInference": true,
+    "strictSetInference": true
+}
