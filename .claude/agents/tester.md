@@ -20,6 +20,7 @@ model: sonnet
 ## 핵심 규칙 (STYLE.md 준수)
 
 ### 파일 구조
+
 ```
 tests/
 ├── conftest.py              # 공통 fixture
@@ -32,6 +33,7 @@ tests/
 테스트 파일 경로는 `src/` 구조 미러링: `src/preprocessing/bg_removal.py` → `tests/test_preprocessing.py`
 
 ### 네이밍
+
 ```python
 def test_<함수명>_<시나리오>():
     ...
@@ -47,6 +49,7 @@ def test_lineart():              # 시나리오 불명
 ```
 
 ### 마커
+
 ```python
 @pytest.mark.slow          # 모델 로딩 포함
 @pytest.mark.gpu           # GPU 필수
@@ -63,6 +66,7 @@ def test_lineart():              # 시나리오 불명
 - 실행 시간 < 1초
 
 **예시**:
+
 ```python
 def test_extract_palette_returns_correct_shape(sample_character):
     """팔레트 추출 결과의 shape가 (k, 3)인가."""
@@ -93,6 +97,7 @@ def test_extract_palette_raises_on_invalid_k():
 - 주로 end-to-end 검증
 
 **예시**:
+
 ```python
 @pytest.mark.slow
 @pytest.mark.gpu
@@ -100,7 +105,7 @@ def test_full_pipeline_end_to_end(sample_character, sample_reference):
     """전체 파이프라인이 RGBA 출력을 생성하는가."""
     pipeline = StyleUnificationPipeline.from_config("configs/default.yaml")
     result = pipeline.transform(sample_character, sample_reference)
-    
+
     assert isinstance(result, Image.Image)
     assert result.mode == "RGBA"
     assert result.size == sample_character.size
@@ -113,7 +118,7 @@ def test_full_pipeline_end_to_end(sample_character, sample_reference):
 ```python
 def test_rgba_preservation_regression():
     """Regression: alpha channel이 파이프라인 중간에 사라지는 버그 재발 방지.
-    
+
     원인: postprocessing에서 RGB로 변환 후 복원을 누락.
     수정: alpha_restore.py의 restore_alpha() 추가.
     """
@@ -140,8 +145,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def sample_character() -> Image.Image:
-    """벡터 스타일 캐릭터 샘플 (작은 크기)."""
-    return Image.open(FIXTURES_DIR / "char_small.png")
+    """벡터 스타일 에셋 샘플 (작은 크기)."""
+    return Image.open(FIXTURES_DIR / "object_small.png")
 
 
 @pytest.fixture
@@ -174,6 +179,7 @@ def tiny_pipeline_config() -> dict:
 - `session`: 전체 테스트 세션 공유 (모델 로드 등)
 
 모델 로드는 `session` scope로:
+
 ```python
 @pytest.fixture(scope="session")
 def loaded_pipeline():
@@ -193,10 +199,10 @@ def test_pipeline_handles_oom_gracefully():
     """OOM 발생 시 CPU offload로 fallback하는가."""
     mock_pipe = MagicMock()
     mock_pipe.side_effect = [torch.cuda.OutOfMemoryError(), MagicMock()]
-    
+
     with patch("src.generation.pipeline.load_pipeline", return_value=mock_pipe):
         result = transform_with_fallback(...)
-    
+
     assert mock_pipe.call_count == 2  # 첫 실패, 두 번째 성공
 ```
 
@@ -242,6 +248,7 @@ def test_palette_invalid_k(sample_character, invalid_k):
    - Fixture 재사용 (이미 있으면 활용)
 
 4. **실행**:
+
    ```bash
    pytest tests/test_<module>.py -v
    pytest tests/test_<module>.py -m "not slow" -v  # 빠른 것만
@@ -262,6 +269,7 @@ def test_palette_invalid_k(sample_character, invalid_k):
 ## 테스트 작성 원칙
 
 **1. 한 테스트에 한 가지만 검증**
+
 ```python
 # ❌ Bad: 여러 개 검증
 def test_palette_works():
@@ -285,6 +293,7 @@ def test_palette_value_range():
 
 **2. Flaky test 금지**
 랜덤성이 있으면 seed 고정:
+
 ```python
 def test_with_random():
     np.random.seed(42)
@@ -312,18 +321,22 @@ def test_with_random():
 ## 테스트 작성 완료
 
 **생성/수정된 파일**:
+
 - `tests/test_preprocessing.py` (신규, 12개 테스트)
 - `tests/conftest.py` (수정, fixture 2개 추가)
 
 **테스트 커버리지**:
+
 - `extract_lineart()`: 4 테스트 (happy + 3 edge)
 - `extract_palette()`: 5 테스트 (happy + 2 edge + 2 error)
 - `remove_background()`: 3 테스트 (1 단위 + 2 slow)
 
 **실행 결과**:
 ```
+
 pytest tests/test_preprocessing.py -v
 ======== 12 passed in 0.8s ========
+
 ```
 
 **느린 테스트**:
