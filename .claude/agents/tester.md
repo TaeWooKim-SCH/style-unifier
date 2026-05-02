@@ -68,17 +68,17 @@ def test_lineart():              # 시나리오 불명
 **예시**:
 
 ```python
-def test_extract_palette_returns_correct_shape(sample_character):
+def test_extract_palette_returns_correct_shape(sample_asset):
     """팔레트 추출 결과의 shape가 (k, 3)인가."""
-    palette = extract_palette(sample_character, k=8)
+    palette = extract_palette(sample_asset, k=8)
     assert palette.shape == (8, 3)
     assert palette.dtype == np.uint8
 
 
-def test_extract_palette_respects_k_parameter(sample_character):
+def test_extract_palette_respects_k_parameter(sample_asset):
     """k 파라미터가 실제 클러스터 개수를 결정하는가."""
-    p4 = extract_palette(sample_character, k=4)
-    p12 = extract_palette(sample_character, k=12)
+    p4 = extract_palette(sample_asset, k=4)
+    p12 = extract_palette(sample_asset, k=12)
     assert len(p4) == 4
     assert len(p12) == 12
 
@@ -101,14 +101,14 @@ def test_extract_palette_raises_on_invalid_k():
 ```python
 @pytest.mark.slow
 @pytest.mark.gpu
-def test_full_pipeline_end_to_end(sample_character, sample_reference):
+def test_full_pipeline_end_to_end(sample_asset, sample_reference):
     """전체 파이프라인이 RGBA 출력을 생성하는가."""
     pipeline = StyleUnificationPipeline.from_config("configs/default.yaml")
-    result = pipeline.transform(sample_character, sample_reference)
+    result = pipeline.transform(sample_asset, sample_reference)
 
     assert isinstance(result, Image.Image)
     assert result.mode == "RGBA"
-    assert result.size == sample_character.size
+    assert result.size == sample_asset.size
 ```
 
 ### 회귀 테스트
@@ -144,8 +144,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
-def sample_character() -> Image.Image:
-    """벡터 스타일 에셋 샘플 (작은 크기)."""
+def sample_asset() -> Image.Image:
+    """벡터 스타일 에셋 샘플 (작은 크기). 카테고리 무관 기본 fixture."""
     return Image.open(FIXTURES_DIR / "object_small.png")
 
 
@@ -171,6 +171,29 @@ def tiny_pipeline_config() -> dict:
         "preprocessing": {"target_size": 64},
     }
 ```
+
+**카테고리별 fixture (선택, 통합 테스트용)**: 캐릭터·사물·아이템 일반화를 검증하고 싶을 때만 추가:
+
+```python
+@pytest.fixture
+def sample_character() -> Image.Image:
+    """캐릭터 카테고리 샘플 (사람·동물·몬스터)."""
+    return Image.open(FIXTURES_DIR / "character_small.png")
+
+
+@pytest.fixture
+def sample_prop() -> Image.Image:
+    """사물 카테고리 샘플 (상자·통·가구)."""
+    return Image.open(FIXTURES_DIR / "prop_small.png")
+
+
+@pytest.fixture
+def sample_item() -> Image.Image:
+    """아이템 카테고리 샘플 (무기·도구·포션)."""
+    return Image.open(FIXTURES_DIR / "item_small.png")
+```
+
+**원칙**: 일반 단위 테스트는 `sample_asset` 사용 (카테고리 무관 검증). 본 시스템은 카테고리 분기 로직이 없으므로 대부분 단위 테스트는 `sample_asset` 하나로 충분. 카테고리별 fixture는 통합 테스트에서 일반화 검증이 필요할 때만 사용.
 
 ### Fixture scope 가이드
 
@@ -216,15 +239,15 @@ def test_pipeline_handles_oom_gracefully():
     (8, 8),
     (16, 16),
 ])
-def test_palette_k_values(sample_character, k, expected):
-    palette = extract_palette(sample_character, k=k)
+def test_palette_k_values(sample_asset, k, expected):
+    palette = extract_palette(sample_asset, k=k)
     assert len(palette) == expected
 
 
 @pytest.mark.parametrize("invalid_k", [0, -1, -100])
-def test_palette_invalid_k(sample_character, invalid_k):
+def test_palette_invalid_k(sample_asset, invalid_k):
     with pytest.raises(ValueError):
-        extract_palette(sample_character, k=invalid_k)
+        extract_palette(sample_asset, k=invalid_k)
 ```
 
 ## 워크플로우
