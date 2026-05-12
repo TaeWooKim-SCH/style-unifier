@@ -13,9 +13,11 @@ model: sonnet
 
 매 호출마다 fresh context로 시작합니다. 작업 시작 전 **반드시** 다음 파일을 읽어 현재 상태를 파악하세요:
 
-1. `CLAUDE.md` — 프로젝트 전체 원칙 및 현재 주차
+1. `CLAUDE.md` — 프로젝트 전체 원칙 및 **현재 그룹(A–F) / 게이트 상태**
 2. `STYLE.md` — 코드 스타일 규칙 (필수 참조)
-3. 작업 대상 모듈의 기존 코드 (있다면)
+3. `docs/technical_design.md` — 작업 대상 모듈 섹션. 특히 **§5.5.1/5.5.2 (Batch consistency + StyleAligned 응용), §5.6/5.7/5.8 (Attribute control / Region mask / External baselines)** 같은 신설 섹션
+4. `docs/technical_design.md` Section 9 — 관련 ADR. 특히 **ADR-007 (차별화 narrative), ADR-008 (GPT Image baseline), ADR-010 (StyleAligned 시도)**
+5. 작업 대상 모듈의 기존 코드 (있다면)
 
 ## 역할
 
@@ -36,7 +38,7 @@ model: sonnet
 
 1. **STYLE.md를 엄격히 따를 것**. 특히:
    - Ruff + Pyright 통과 가능한 코드 작성
-   - 타입 힌트 필수 (Python 3.10+ 문법: `int | None`)
+   - 타입 힌트 필수 (Python 3.11 문법: `int | None`)
    - Google-style docstring
    - `pathlib.Path` 사용 (문자열 경로 금지)
    - `logging` 사용 (`print` 금지)
@@ -50,7 +52,9 @@ model: sonnet
 
 4. **기존 코드 스타일 준수**. 파일을 수정할 때는 주변 코드의 패턴을 따를 것.
 
-5. **Scope 엄수**. CLAUDE.md의 out-of-scope 항목(Unity 플러그인, LoRA 학습 등)은 작성 금지.
+5. **Scope 엄수**. CLAUDE.md의 out-of-scope 항목(Unity 플러그인, 대규모 LoRA 학습, SaaS 등)은 작성 금지. 단 ADR-002 개정에 따라 **경량 개인 LoRA(그룹 E3)** 는 야심 옵션으로 허용됨.
+
+6. **위험한 architectural 작업은 별도 인지**. 그룹 D5 (`src/encoding/shared_attention.py`, StyleAligned 응용)는 첫 시도에 작동 보장 없는 시도. 구현 전 **§5.5.2와 ADR-010 의사결정 프로토콜**을 다시 확인할 것. D1(§5.5.1 후처리 baseline)이 fallback이므로 D5 실패는 프로젝트 실패가 아님.
 
 ## 워크플로우
 
@@ -80,6 +84,7 @@ model: sonnet
    - 구현한 파일 경로 나열
    - 주요 설계 결정 요약 (예: "왜 이 알고리즘을 선택했는가")
    - 다음 단계 제안 (예: "tester 에이전트로 테스트 추가 권장")
+   - 자체 검증 결과(ruff/pyright/테스트 상태)를 명시 — 오케스트레이터가 work-log에 종합 정리할 때 이 정보를 사용
 
 ### 기존 코드 수정 요청 시
 
@@ -92,6 +97,22 @@ model: sonnet
    - Breaking change면 사용하는 쪽도 함께 수정
 
 3. **검증**: 위와 동일
+
+## ML 디버깅 가이드 (짧은 체크리스트)
+
+복잡한 모델 코드 구현 후 작동 안 할 때 점검 순서:
+
+1. **CUDA OOM** — `enable_model_cpu_offload()` 적용했나? 해상도 1024 초과 아닌가? batch size 줄였나?
+2. **Tensor shape mismatch** (attention processor 같은 경우):
+   - `print` 대신 `logger.debug(f"shape={tensor.shape}, dtype={tensor.dtype}, device={tensor.device}")`
+   - batch dim, seq dim, hidden dim을 순서대로 확인
+3. **Device 불일치** — 모델은 CUDA인데 입력이 CPU인 경우 흔함. `get_device()` 일관 사용
+4. **dtype 불일치** — fp16/fp32 혼용 위험. `torch_dtype` 통일
+5. **Gradient 누수** — 추론 코드에 `with torch.no_grad():` 또는 `torch.inference_mode()` 둘러쌌나?
+6. **Random seed** — 재현 안 되면 `src.utils.repro.set_seed(seed)` 적용했나?
+7. **ControlNet과 다른 conditioning 충돌** — D5의 경우 reference의 형태가 출력에 새어 들어가는지 시각 확인 필요
+
+위 7개를 통과하고도 작동 안 하면 `researcher` 에이전트로 원인 조사 위임 권장.
 
 ## 의존성 추가 규칙
 

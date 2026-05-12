@@ -11,11 +11,12 @@ model: sonnet
 
 ## 매 호출 시 확인
 
-1. `CLAUDE.md` — 현재 주차, 프로젝트 상태
+1. `CLAUDE.md` — **현재 그룹(A–F) / 게이트 상태**, 프로젝트 상태
 2. `STYLE.md` Section 9 — 테스트 규칙 (필수)
 3. 테스트 대상 파일
 4. 기존 `tests/` 폴더 구조 및 `conftest.py`
 5. `pyproject.toml`의 pytest 설정
+6. 새 메트릭/모듈 테스트 시 `docs/technical_design.md` 해당 섹션 (§5.5.2 shared attention / §7.2 σ_consistency / §7.3 ablation)
 
 ## 핵심 규칙 (STYLE.md 준수)
 
@@ -195,6 +196,30 @@ def sample_item() -> Image.Image:
 
 **원칙**: 일반 단위 테스트는 `sample_asset` 사용 (카테고리 무관 검증). 본 시스템은 카테고리 분기 로직이 없으므로 대부분 단위 테스트는 `sample_asset` 하나로 충분. 카테고리별 fixture는 통합 테스트에서 일반화 검증이 필요할 때만 사용.
 
+**배치 fixture (그룹 D 테스트용)** — `transform_batch` / σ_consistency / shared attention 테스트 시 사용:
+
+```python
+@pytest.fixture
+def sample_batch() -> list[Image.Image]:
+    """N개 source 리스트. 배치 일관성 모듈 테스트용."""
+    return [
+        Image.open(FIXTURES_DIR / "character_small.png"),
+        Image.open(FIXTURES_DIR / "prop_small.png"),
+        Image.open(FIXTURES_DIR / "item_small.png"),
+    ]
+
+
+@pytest.fixture
+def synthetic_batch() -> list[Image.Image]:
+    """합성 RGBA N개. 외부 파일 의존성 없음."""
+    batch = []
+    for color in [(255, 0, 0, 255), (0, 255, 0, 255), (0, 0, 255, 255)]:
+        arr = np.zeros((64, 64, 4), dtype=np.uint8)
+        arr[16:48, 16:48] = color
+        batch.append(Image.fromarray(arr, mode="RGBA"))
+    return batch
+```
+
 ### Fixture scope 가이드
 
 - `function` (기본): 매 테스트마다 새로 생성
@@ -210,9 +235,128 @@ def loaded_pipeline():
     return StyleUnificationPipeline.from_config("configs/test.yaml")
 ```
 
-## Mock 사용
+## 프로젝트 특수 테스트 패턴
 
-모델을 실제로 로드하지 않고 로직만 테스트:
+### σ_consistency 메트릭 (§7.2)
+
+배치 일관성 메트릭은 **출력 집합 위에서 정의**됨. 단일 페어가 아닌 N개 출력을 받음. 테스트 시 주의:
+
+```python
+def test_sigma_palette_zero_for_identical_outputs(synthetic_batch):
+    """동일한 N개 출력 → σ_palette = 0."""
+    identical = [synthetic_batch[0]] * 5
+    assert sigma_palette(identical) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_sigma_palette_monotonic_with_diversity():
+    """출력 다양성이 클수록 σ_palette 증가."""
+    similar = [make_image(hue=h) for h in [0.5, 0.51, 0.52]]
+    diverse = [make_image(hue=h) for h in [0.1, 0.5, 0.9]]
+    assert sigma_palette(diverse) > sigma_palette(similar)
+
+
+def test_sigma_palette_handles_single_output():
+    """N=1일 때 σ는 0 또는 명시적 에러."""
+    single = [synthetic_batch[0]]
+    # 선택: 0 반환 or ValueError("need N >= 2")
+    ...
+```
+
+**원칙**: σ_consistency는 *상대* 메트릭이라 절대값 검증 어려움. 대신 (a) **자명한 경우(동일 입력→0)**, (b) **monotonicity** (다양성↑ → σ↑), (c) **edge case** (N=1, 빈 입력)를 검증.
+
+### Shared attention processor (§5.5.2, 그룹 D5)
+
+Attention 코드는 **shape 디버깅이 핵심**. 실제 SDXL UNet 로드 없이 mock attention layer로 shape 검증:
+
+```python
+def test_shared_kv_attn_processor_broadcasts_batch_0():
+    """batch[0]의 K, V가 batch[1..N]에 broadcast되는지 확인.
+
+    실제 attention 계산 불필요. K, V 텐서 비교만으로 검증 가능.
+    """
+    processor = SharedKVAttnProcessor()
+
+    # Fake attention layer (필요한 메서드만 mock)
+    attn = MagicMock()
+    B, seq, dim = 3, 64, 128  # batch=3 (reference + 2 sources)
+    hidden = torch.randn(B, seq, dim)
+    attn.to_q.return_value = torch.randn(B, seq, dim)
+    attn.to_k.return_value = torch.randn(B, seq, dim)
+    attn.to_v.return_value = torch.randn(B, seq, dim)
+
+    # processor 내부에서 K, V가 어떻게 변형되는지 hook으로 검증
+    # 예: batch[1], batch[2]의 K가 batch[0]의 K와 같아야 함
+    ...
+
+
+def test_shared_kv_with_share_layers_option():
+    """share_layers=[0, 5]면 해당 layer index에서만 공유."""
+    processor = SharedKVAttnProcessor(share_layers=[0, 5])
+    # layer 0, 5에서는 공유, 나머지에서는 원래 K, V 사용
+    ...
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+def test_shared_attention_does_not_break_controlnet():
+    """ControlNet과 함께 사용 시 형태 보존이 무너지지 않는지.
+
+    reference + source 2개 batch로 변환 후 DINOv2 identity 측정.
+    Identity가 크게 떨어지면(임계값) reference 형태가 새어 들어간 신호.
+    """
+    pipeline = StyleUnificationPipeline.from_config("configs/test.yaml")
+    apply_shared_attention(pipeline)
+
+    outputs = pipeline.transform_batch(
+        sources=[source1, source2],
+        reference=ref,
+        use_shared_attention=True,
+    )
+
+    for source, output in zip([source1, source2], outputs):
+        identity = dino_identity(source, output)
+        assert identity > 0.7, f"Shared attention may be leaking reference shape: {identity}"
+```
+
+**원칙**: D5는 shape 디버깅 + 의미적 검증을 분리. shape는 mock으로, 의미(형태 보존)는 통합 테스트로.
+
+### Batch consistency 후처리 (§5.5.1)
+
+```python
+def test_extract_style_statistics_returns_expected_fields(sample_reference):
+    """StyleStatistics dataclass의 모든 필드가 채워지는가."""
+    stats = extract_style_statistics(sample_reference, palette_k=12)
+    assert stats.palette.shape == (12, 3)
+    assert stats.mean_linewidth > 0
+    assert stats.shading_histogram.sum() == pytest.approx(1.0)
+
+
+def test_enforce_consistency_reduces_sigma(synthetic_batch, sample_reference):
+    """후처리 적용 후 σ_palette가 감소하는가."""
+    stats = extract_style_statistics(sample_reference)
+    enforced = enforce_consistency(synthetic_batch, stats, palette_strength=1.0)
+
+    sigma_before = sigma_palette(synthetic_batch)
+    sigma_after = sigma_palette(enforced)
+    assert sigma_after < sigma_before
+```
+
+### GPT Image baseline (§5.8.1)
+
+API 호출은 절대 실제 테스트에서 하지 말 것. 캐시 동작과 입력 hashing만 검증:
+
+```python
+def test_gpt_image_baseline_uses_cache_for_same_input(tmp_path):
+    """동일 source+reference+prompt → API 호출 1회만."""
+    baseline = GPTImageBaseline(cache_dir=tmp_path)
+    with patch.object(baseline, "_call_api") as mock_api:
+        mock_api.return_value = synthetic_rgba_image
+        baseline.transform(source, reference)
+        baseline.transform(source, reference)  # 동일 입력
+        assert mock_api.call_count == 1  # 두 번째는 캐시 적중
+```
+
+
 
 ```python
 from unittest.mock import MagicMock, patch

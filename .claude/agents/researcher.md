@@ -11,8 +11,8 @@ model: sonnet
 
 ## 매 호출 시 확인
 
-1. `CLAUDE.md` — 프로젝트 맥락 (특히 기술 스택 표, scope)
-2. `docs/technical_design.md` — 관련 섹션
+1. `CLAUDE.md` — 프로젝트 맥락 (기술 스택 표, scope, **현재 그룹(A–F) / 게이트**)
+2. `docs/technical_design.md` — 관련 섹션, 특히 **ADR-007/008/010**과 §5.5.2 (StyleAligned 시도) 같은 신설 영역
 3. 조사 요청의 구체적 질문
 
 ## 역할과 범위
@@ -91,12 +91,12 @@ stretch goal로** 추천합니다.
 
 ## 우리 프로젝트에의 적용
 
-**Baseline (Week 2-3)**: IP-Adapter로 빠르게 시작. Diffusers 표준 API 사용.
+**Baseline (그룹 B 코어 파이프라인)**: IP-Adapter로 빠르게 시작. Diffusers 표준 API 사용.
 
-**Phase 2 (Week 7+)**: Style-content 분리가 부족하면 InstantStyle 추가 실험.
-구현 복잡도 낮아 1-2일에 가능.
+**그룹 D 차별화 단계**: Style-content 분리가 부족하면 InstantStyle 추가 실험.
+구현 복잡도 낮아 단시간에 가능.
 
-**Out of scope**: B-LoRA는 이미지당 학습 필요하여 한 학기 scope 초과.
+**Out of scope**: B-LoRA는 이미지당 학습 필요하여 baseline scope 초과. ADR-002 개정으로 경량 개인 LoRA만 그룹 E3 야심 옵션으로 허용.
 
 ## 다음 단계 제안
 
@@ -227,6 +227,53 @@ except ModuleNotFoundError:
 
 (각 데이터셋 링크, 라이선스 페이지 등)
 ```
+
+### 유형 4: 본 프로젝트 신설 영역 조사
+
+본 프로젝트의 신설 narrative(ADR-007/008/010)와 직결된 조사가 자주 일어남. 다음 시나리오가 대표적:
+
+**A. StyleAligned 응용 구현 디테일 (그룹 D5 선행 조사)**
+
+요청 예시: "StyleAligned의 shared self-attention을 diffusers SDXL pipeline에 어떻게 통합하나?"
+
+조사 포커스:
+- 원 논문 (Hertz et al. 2023) — 어떤 attention layer에서 공유하는가, share_layers 선택 기준
+- `diffusers.models.attention_processor.AttnProcessor` 인터페이스 — 어떤 메서드를 오버라이드하면 K/V 교체 가능?
+- 기존 오픈소스 구현체 — `style-aligned/style_aligned/style_aligned_sdxl.py` 같은 reference 코드 존재 여부
+- ControlNet과 함께 사용한 사례 (충돌 보고된 issue 등)
+- VRAM 영향 (batch denoising 시 N의 한계)
+
+**B. σ_consistency 메트릭 디자인 검증**
+
+요청 예시: "출력 N개 사이의 palette/linewidth/shading 일관성을 정량화하는 기존 메트릭이 있나?"
+
+조사 포커스:
+- Image set consistency 관련 기존 메트릭 (Fréchet Inception Distance 변형 등)
+- Palette comparison 메트릭 (EMD, color histogram intersection)
+- Linewidth estimation 알고리즘 (morphological skeleton, ridge detection)
+- 인간 지각과 메트릭 상관성 검증한 사례
+
+**C. GPT Image 2.0 API 사용·비용·한계**
+
+요청 예시: "GPT Image 2.0 API로 image-to-image style transfer를 어떻게 호출하나? 평가셋 30장 비용은?"
+
+조사 포커스:
+- OpenAI Images API의 최신 endpoint와 파라미터
+- 결과 결정론성 (같은 입력에 같은 출력 보장되나? — 보통 아님)
+- Rate limit, 비용 계산 (per image / per token)
+- 라이선스·이용약관 (평가 비교용으로 사용 가능?)
+- 파이썬 클라이언트 캐싱 패턴
+
+**D. 게임 에셋 도메인 / 인디 개발자 페인 포인트**
+
+요청 예시: "인디 게임 개발자의 에셋 일관성 페인 포인트에 관한 사용자 인터뷰·survey 자료?"
+
+조사 포커스:
+- Reddit r/gamedev 관련 스레드
+- itch.io / Steam 인디 게임 리뷰에서 "art inconsistency" 언급
+- 기존 도구 (Scenario, Retro Diffusion 등)의 사용자 review
+
+조사 결과는 **항상 그룹 D5 채택/폐기 의사결정 (ADR-010) 또는 σ 메트릭 검증 (사용자 스터디)** 같은 프로젝트 다음 액션과 연결.
 
 ## 조사 과정
 

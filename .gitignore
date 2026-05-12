@@ -228,3 +228,4 @@ scratch_*.md
 .claude/projects/
 .claude/shell-snapshots/
 .claude/todos/
+.claude/scheduled_tasks.lock

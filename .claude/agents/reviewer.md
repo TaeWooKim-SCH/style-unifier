@@ -19,15 +19,16 @@ model: sonnet
 
 Fresh context로 시작합니다. 리뷰 전에 반드시:
 
-1. `CLAUDE.md` — 프로젝트 원칙 및 현재 상태
+1. `CLAUDE.md` — 프로젝트 원칙 및 **현재 그룹(A–F) / 게이트 상태**
 2. `STYLE.md` — 스타일 규칙 (리뷰의 기준)
-3. 리뷰 대상 파일과 관련 파일들 (Grep으로 dependency 파악)
+3. `docs/technical_design.md` Section 9 — **모든 ADR**, 특히 새 결정: **ADR-007 (차별화 narrative), ADR-008 (GPT Image baseline), ADR-010 (StyleAligned 시도)**
+4. 리뷰 대상 파일과 관련 파일들 (Grep으로 dependency 파악)
 
 ## 리뷰 체크리스트
 
 ### 1. 스타일 준수 (STYLE.md 기반)
 
-- [ ] 타입 힌트: 모든 public 함수에 있는가? Python 3.10+ 문법 사용?
+- [ ] 타입 힌트: 모든 public 함수에 있는가? Python 3.11 문법 사용?
 - [ ] Docstring: Google-style인가? Args/Returns/Raises 모두 있는가?
 - [ ] 네이밍: snake_case/PascalCase/UPPER_CASE 준수?
 - [ ] 임포트 순서: 표준 → 서드파티 → 로컬, 그룹 사이 빈 줄?
@@ -48,17 +49,46 @@ Fresh context로 시작합니다. 리뷰 전에 반드시:
 - [ ] **Device 하드코딩**: `"cuda"`, `"cpu"` 하드코딩이 있나? → `get_device()` 사용해야 함
 - [ ] **dtype**: fp16을 CPU에서 쓰려는 코드 없나? device 체크 후 dtype 결정?
 - [ ] **Gradient**: 추론 코드에 `torch.no_grad()` 또는 `torch.inference_mode()`?
-- [ ] **Seed**: 실험 관련 코드에 seed 명시?
+- [ ] **Seed**: 실험 관련 코드에 seed 명시 (`src.utils.repro.set_seed`)?
 - [ ] **메모리**: 큰 텐서 사용 후 `del` + `torch.cuda.empty_cache()`?
 - [ ] **PIL vs Tensor**: 함수 시그니처에서 경계 명확한가?
 - [ ] **enable_model_cpu_offload()**: 12GB VRAM 고려한 최적화 있나?
+
+### 3a. 프로젝트 특수 검토 (신설 모듈)
+
+- [ ] **σ_consistency 메트릭** (`src/evaluation/consistency.py`):
+  - 출력 집합에서 작동하나 (단일 페어 아님)?
+  - N=1 등 edge case 처리?
+  - LAB 색공간으로 변환 정확한가 (RGB k-means가 아닌 LAB)?
+- [ ] **Batch consistency 후처리** (§5.5.1, `src/encoding/batch_consistency.py`):
+  - `StyleStatistics` 모든 필드가 reference 1장에서 채워지나?
+  - IP-Adapter 임베딩 캐싱이 실제로 재사용되나 (N번 계산 X)?
+- [ ] **Shared attention** (§5.5.2, `src/encoding/shared_attention.py`, 그룹 D5):
+  - batch dim 0(reference)를 가정하는 코드인가? — 입력 순서 강제 명시?
+  - `share_layers` 옵션이 실제로 전달·적용되나?
+  - ControlNet hook과 충돌 흔적 (예: forward에서 batch dim 불일치)?
+  - VRAM 보호 — N ≥ 5 입력 시 명시적 에러/sequential fallback?
+- [ ] **Attribute control** (`src/postprocessing/attribute_control.py`):
+  - 토글 4개 (`palette` / `lineart` / `shading` / `full`)가 정확히 라우팅되나?
+  - "강도 0%" 처리 (off와 동등)?
+- [ ] **Region mask** (`src/postprocessing/region_mask.py`):
+  - 마스크 dimension이 출력 dimension과 일치 검증?
+  - feathering 경계 부드러움?
+- [ ] **GPT Image baseline** (`src/baselines/gpt_image.py`):
+  - API 키는 환경변수에서? 코드에 hardcode 안 됐나?
+  - 캐시 동작이 정확히 hash(source) + hash(reference) + prompt 키?
+  - 비용 누적 막기 위한 가드 (예: max_calls)?
 
 ### 4. 설계 일관성
 
 - [ ] 하드코딩된 하이퍼파라미터 없는가? (config로 빼야 함)
 - [ ] 기존 모듈과 중복된 기능 구현하지 않았는가? (Grep으로 확인)
-- [ ] `CLAUDE.md` scope 벗어난 기능 없는가? (Unity 통합, LoRA 학습 등)
-- [ ] ADR 결정사항을 위반하지 않는가?
+- [ ] `CLAUDE.md` scope 벗어난 기능 없는가? (Unity 통합, 대규모 LoRA 학습 등)
+- [ ] ADR 결정사항을 위반하지 않는가? 특히:
+  - **ADR-007**: 단일 이미지 raw 품질 경쟁 narrative 부활하지 않았나? (배치 일관성·형태 보존·재현성 중심 유지)
+  - **ADR-008**: GPT Image 2.0을 경쟁자가 아닌 평가 baseline으로 다루는가?
+  - **ADR-009**: 시간 기반 일정(주차) 표현이 새로 들어왔나? → 그룹/게이트로 표현해야 함
+  - **ADR-010**: 그룹 D5 (StyleAligned)를 baseline처럼 단정 표현 안 했나? "시도 중인 architectural approach" 표기 유지?
 
 ### 5. 성능 및 버그 가능성
 
