@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import torch
 from PIL import Image
@@ -47,8 +49,11 @@ def _load_rmbg_model(model_name: str) -> tuple[object, object]:
             + " Install them with: pip install transformers torchvision"
         ) from exc
 
-    device = get_device()
-    dtype = get_dtype(device)
+    # RMBG는 CPU에서 fp32로 실행한다. RTX 4070 12GB는 SDXL+ControlNet+IP-Adapter (cpu_offload
+    # 활성)로도 빠듯하여, 1024×1024 source upscale 시 RMBG GPU 상주 시 OOM이 발생한다.
+    # RMBG는 transform당 1회만 호출되므로 CPU 5-10초 추가 비용은 수용 가능하다.
+    device = torch.device("cpu")
+    dtype = torch.float32
 
     logger.info("Loading RMBG model: %s (device=%s, dtype=%s)", model_name, device, dtype)
 
@@ -99,16 +104,40 @@ def _run_rmbg_inference(
         (H, W) float32 mask, 값 범위 [0, 1].
     """
     orig_w, orig_h = rgb_image.size
-    device = get_device()
+
+    # CRITICAL: input device/dtype을 model parameter device/dtype에 맞춰야 한다.
+    # RMBG는 OOM 회피를 위해 CPU에서 실행되지만, model을 다른 곳으로 옮긴 경우에도 자동 정합.
+    model_device: torch.device = torch.device("cpu")
+    model_dtype: torch.dtype | None = None
+    try:
+        first_param = next(model.parameters())  # type: ignore[attr-defined]
+        if isinstance(first_param.device, torch.device):
+            model_device = first_param.device
+        if isinstance(first_param.dtype, torch.dtype):
+            model_dtype = first_param.dtype
+    except (StopIteration, AttributeError, TypeError):
+        # mock model (테스트) 또는 parameters() 미지원 — get_device() fallback
+        model_device = get_device()
+        model_dtype = None
 
     input_tensor: torch.Tensor = transform(rgb_image)  # type: ignore[operator]
-    input_tensor = input_tensor.unsqueeze(0).to(device)
+    input_tensor = input_tensor.unsqueeze(0).to(model_device)
+    if model_dtype is not None:
+        input_tensor = input_tensor.to(dtype=model_dtype)
 
     with torch.inference_mode():
         preds = model(input_tensor)  # type: ignore[operator]
 
-    # RMBG-1.4는 리스트 또는 단일 텐서를 반환
-    pred = preds[-1] if isinstance(preds, list | tuple) else preds
+    # RMBG-1.4 forward 반환 형태:
+    #   1. 단일 Tensor (transformers wrapper)
+    #   2. list[Tensor] (단일 d list)
+    #   3. (d_list, s_list) — briarmbg.py original. d_list[0]이 fused 최종 mask.
+    # 어떤 형태든 첫 번째 Tensor에 도달할 때까지 unwrap 한다.
+    pred: Any = preds
+    while isinstance(pred, list | tuple):
+        if len(pred) == 0:
+            raise RuntimeError("RMBG model returned empty output")
+        pred = pred[0]
 
     # (1, 1, H, W) → (H, W)
     mask_tensor = pred.squeeze().float().cpu()

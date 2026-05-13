@@ -32,12 +32,36 @@ class ModelSpec:
         repo_id: HuggingFace 리포지토리 ID.
         description: 사람이 읽을 수 있는 용도 설명.
         allow_patterns: 다운로드할 파일 패턴 목록. ``None`` 이면 전체.
+        ignore_patterns: 제외할 파일 패턴 목록. ``allow_patterns``보다 우선.
     """
 
     key: str
     repo_id: str
     description: str
     allow_patterns: tuple[str, ...] | None = None
+    ignore_patterns: tuple[str, ...] | None = None
+
+
+_DIFFUSERS_IGNORE: tuple[str, ...] = (
+    "*.onnx",
+    "*.onnx_data",
+    "openvino_model.*",
+    "**/openvino_model.*",
+    "*.msgpack",
+    "**/*.msgpack",
+    "*flax*",
+    "**/*flax*",
+    "*.fp16.safetensors",
+    "**/*.fp16.safetensors",
+    "*.bin",
+    "**/*.bin",
+    "*.ckpt",
+    "**/*.ckpt",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+)
 
 
 MODELS: tuple[ModelSpec, ...] = (
@@ -45,45 +69,74 @@ MODELS: tuple[ModelSpec, ...] = (
         key="sdxl",
         repo_id="stabilityai/stable-diffusion-xl-base-1.0",
         description="SDXL 베이스 모델",
+        ignore_patterns=_DIFFUSERS_IGNORE + (
+            "sd_xl_base_1.0.safetensors",
+            "sd_xl_base_1.0_0.9vae.safetensors",
+            "sd_xl_offset_example-lora_1.0.safetensors",
+        ),
     ),
     ModelSpec(
         key="animagine",
         repo_id="cagliostrolab/animagine-xl-3.1",
         description="Animagine-XL-3.1 — 일러스트 풍 파인튜닝",
+        ignore_patterns=_DIFFUSERS_IGNORE + (
+            "animagine-xl-3.1.safetensors",
+        ),
     ),
     ModelSpec(
         key="ipadapter",
         repo_id="h94/IP-Adapter",
-        description="IP-Adapter — 스타일 인코딩 (SDXL 모델만)",
+        description="IP-Adapter — 스타일 인코딩 (SDXL plus vit-h variant만)",
         allow_patterns=(
-            "sdxl_models/*",
-            "models/image_encoder/*",
+            "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors",
+            "models/image_encoder/config.json",
+            "models/image_encoder/model.safetensors",
         ),
     ),
     ModelSpec(
         key="controlnet_lineart",
         repo_id="diffusers/controlnet-canny-sdxl-1.0",
         description="ControlNet canny/lineart — 라인 컨디션 (추후 lineart-specific으로 교체 가능)",
+        ignore_patterns=_DIFFUSERS_IGNORE,
     ),
     ModelSpec(
         key="controlnet_depth",
         repo_id="diffusers/controlnet-depth-sdxl-1.0",
         description="ControlNet depth — 깊이 컨디션",
+        ignore_patterns=_DIFFUSERS_IGNORE,
     ),
     ModelSpec(
         key="rmbg",
         repo_id="briaai/RMBG-1.4",
         description="RMBG-1.4 — 배경 제거",
+        ignore_patterns=(
+            "*.onnx",
+            "model.pth",
+        ),
     ),
     ModelSpec(
         key="clip",
         repo_id="laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
-        description="CLIP ViT-H/14 — IP-Adapter용 이미지 인코더",
+        description="CLIP ViT-H/14 — transformers 포맷만 (open_clip 중복 제외)",
+        allow_patterns=(
+            "config.json",
+            "model.safetensors",
+            "preprocessor_config.json",
+            "merges.txt",
+            "vocab.json",
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "special_tokens_map.json",
+        ),
     ),
     ModelSpec(
         key="dinov2",
         repo_id="facebook/dinov2-large",
         description="DINOv2-Large — 평가용 identity 메트릭",
+        ignore_patterns=(
+            "*.bin",
+            "*.msgpack",
+        ),
     ),
 )
 
@@ -130,8 +183,9 @@ def _download_one(
     )
 
     if dry_run:
-        patterns_str = ", ".join(spec.allow_patterns) if spec.allow_patterns else "전체"
-        logger.info("  DRY-RUN: 패턴=%s", patterns_str)
+        allow_str = ", ".join(spec.allow_patterns) if spec.allow_patterns else "전체"
+        ignore_str = ", ".join(spec.ignore_patterns) if spec.ignore_patterns else "없음"
+        logger.info("  DRY-RUN: allow=%s | ignore=%s", allow_str, ignore_str)
         return DownloadResult(spec=spec, success=True)
 
     try:
@@ -149,6 +203,7 @@ def _download_one(
             cache_dir=str(cache_dir),
             token=token,
             allow_patterns=list(spec.allow_patterns) if spec.allow_patterns else None,
+            ignore_patterns=list(spec.ignore_patterns) if spec.ignore_patterns else None,
         )
         local_path = Path(local_dir_str)
         logger.info("  저장 위치: %s", local_path)

@@ -11,13 +11,15 @@ model:
     repo: "h94/IP-Adapter"
     subfolder: "sdxl_models"
     weight_name: "ip-adapter-plus_sdxl_vit-h.safetensors"
-    scale: 0.7
+    # 0.7 (변화 없음) -> 1.0 (artifact) -> 0.8 (balanced) (2026-05-14 B 게이트)
+    scale: 0.8
 
   controlnet:
     - type: "lineart"
       # lineart 전용 체크포인트가 없어 canny-sdxl로 임시 대체 (그룹 E에서 재검토)
       repo: "diffusers/controlnet-canny-sdxl-1.0"
-      scale: 0.9
+      # 0.9 (변화 없음) -> 0.6 (형태 깨짐) -> 0.8 (balanced) (2026-05-14)
+      scale: 0.8
       enabled: true
     - type: "depth"
       repo: "diffusers/controlnet-depth-sdxl-1.0"
@@ -32,22 +34,29 @@ sampling:
     algorithm_type: "sde-dpmsolver++"
   steps: 25
   cfg_scale: 6.0
-  denoising_strength: 0.55
+  # 0.55 (변화 없음) -> 0.7 (artifact) -> 0.5 (balanced) (2026-05-14)
+  denoising_strength: 0.5
   # null이면 랜덤 동작. 재현 시 정수 seed를 명시할 것 (CLAUDE.md 결정론적 재현성 원칙)
   seed: null
 
 preprocessing:
   bg_removal_model: "briaai/RMBG-1.4"
   # lineart detector: "lineart_anime" | "lineart_realistic" | "canny"
-  lineart_detector: "lineart_anime"
+  # 2026-05-14: lineart_anime의 anti-aliased grayscale 라인이 ControlNet canny-sdxl 모델
+  # (binary edge 학습)과 mismatch → fragment artifact 발생. canny detector로 통일하여
+  # conditioning 정합. lineart-specific SDXL 체크포인트 출시 시 lineart_anime 복귀 검토.
+  lineart_detector: "canny"
   target_size: 1024
   preserve_aspect_ratio: true
 
 postprocessing:
-  palette_quantize: true
+  # palette_quantize: 결과 색상을 source 팔레트로 강제 환원. B 게이트 검증에서
+  # reference 색감이 후처리에서 무효화되는 문제 발견 → 기본 비활성화로 변경 (2026-05-14).
+  # 배치 일관성 (D1) 사용 시 batch_consistency.enforce_consistency 가 별도로 처리.
+  palette_quantize: false
   palette_k: 12
-  # palette quantize 강도. 0=원본 유지, 1=완전 양자화, 0.7=soft snap (기본)
-  palette_strength: 0.7
+  # palette_strength: 0.7 -> 0.3 (활성화 시에도 reference 영향을 더 살림)
+  palette_strength: 0.3
   # alpha 경계 feathering 반경 (px). 0이면 feathering 없음
   alpha_feather: 1
 
