@@ -82,7 +82,7 @@ ControlNet(lineart)로 원본 구조를 강하게 잠그고, 원본 alpha mask�
 | 후처리 | Color Transfer               | Palette quantization        |
 
 **평가 단계** (개발·검증 시점만 사용, 추론 외):
-
+ 
 | 단계 | Vision Task    | 사용 메트릭                                                                |
 | ---- | -------------- | -------------------------------------------------------------------------- |
 | 평가 | Perceptual IQA | LPIPS, CLIP Style Sim, DINOv2 Identity, Palette EMD                        |
